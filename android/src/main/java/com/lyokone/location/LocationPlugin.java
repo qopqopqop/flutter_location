@@ -2,20 +2,13 @@ package com.lyokone.location;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.Context;
-import android.content.BroadcastReceiver;
 import android.content.IntentSender;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.Looper;
-import android.support.annotation.MainThread;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
 import com.google.android.gms.common.api.ApiException;
@@ -30,12 +23,9 @@ import com.google.android.gms.location.SettingsClient;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
-import com.google.android.gms.tasks.Task;
 
 import java.util.HashMap;
-import java.lang.RuntimeException;
 
 import io.flutter.plugin.common.EventChannel;
 import io.flutter.plugin.common.EventChannel.EventSink;
@@ -54,8 +44,8 @@ public class LocationPlugin implements MethodCallHandler, StreamHandler {
     private static final String STREAM_CHANNEL_NAME = "lyokone/locationstream";
     private static final String METHOD_CHANNEL_NAME = "lyokone/location";
 
-    private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
-    private static final int REQUEST_CHECK_SETTINGS = 0x1;
+    private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 1398463;
+    private static final int REQUEST_CHECK_SETTINGS = 1398563;
     private static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
     private static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
 
@@ -70,9 +60,11 @@ public class LocationPlugin implements MethodCallHandler, StreamHandler {
     private Result result;
 
     private final Activity activity;
+    private final int requestIndex;
 
-    LocationPlugin(Activity activity) {
+    LocationPlugin(Activity activity, int requestIndex) {
         this.activity = activity;
+        this.requestIndex = requestIndex;
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(activity);
         mSettingsClient = LocationServices.getSettingsClient(activity);
         createLocationCallback();
@@ -89,7 +81,9 @@ public class LocationPlugin implements MethodCallHandler, StreamHandler {
         mPermissionsResultListener = new PluginRegistry.RequestPermissionsResultListener() {
             @Override
             public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-                if (requestCode == REQUEST_PERMISSIONS_REQUEST_CODE && permissions.length == 1 && permissions[0].equals(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                if (requestCode == (REQUEST_PERMISSIONS_REQUEST_CODE + requestIndex) &&
+                    permissions.length == 1 && permissions[0].equals(Manifest.permission.ACCESS_FINE_LOCATION))
+                {
                     if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                         if (result != null) {
                             getLastLocation(result);
@@ -194,7 +188,7 @@ public class LocationPlugin implements MethodCallHandler, StreamHandler {
 
     private void requestPermissions() {
         ActivityCompat.requestPermissions(activity, new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                REQUEST_PERMISSIONS_REQUEST_CODE);
+                REQUEST_PERMISSIONS_REQUEST_CODE + requestIndex);
     }
 
     private boolean shouldShowRequestPermissionRationale() {
@@ -206,12 +200,12 @@ public class LocationPlugin implements MethodCallHandler, StreamHandler {
      */
     public static void registerWith(Registrar registrar) {
         final MethodChannel channel = new MethodChannel(registrar.messenger(), METHOD_CHANNEL_NAME);
-        LocationPlugin locationWithMethodChannel = new LocationPlugin(registrar.activity());
+        LocationPlugin locationWithMethodChannel = new LocationPlugin(registrar.activity(), 0);
         channel.setMethodCallHandler(locationWithMethodChannel);
         registrar.addRequestPermissionsResultListener(locationWithMethodChannel.getPermissionsResultListener());
 
         final EventChannel eventChannel = new EventChannel(registrar.messenger(), STREAM_CHANNEL_NAME);
-        LocationPlugin locationWithEventChannel = new LocationPlugin(registrar.activity());
+        LocationPlugin locationWithEventChannel = new LocationPlugin(registrar.activity(), 1);
         eventChannel.setStreamHandler(locationWithEventChannel);
         registrar.addRequestPermissionsResultListener(locationWithEventChannel.getPermissionsResultListener());
     }
@@ -290,7 +284,7 @@ public class LocationPlugin implements MethodCallHandler, StreamHandler {
                             // Show the dialog by calling startResolutionForResult(), and check the
                             // result in onActivityResult().
                             ResolvableApiException rae = (ResolvableApiException) e;
-                            rae.startResolutionForResult(activity, REQUEST_CHECK_SETTINGS);
+                            rae.startResolutionForResult(activity, REQUEST_CHECK_SETTINGS + requestIndex);
                         } catch (IntentSender.SendIntentException sie) {
                             Log.i(METHOD_CHANNEL_NAME, "PendingIntent unable to execute request.");
                         }

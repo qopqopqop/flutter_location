@@ -95,4 +95,21 @@
     }
 }
 
+-(void)locationManager:(CLLocationManager*)manager didFailWithError:(nonnull NSError *)error {
+    if (error.code == kCLErrorDenied) {
+        FlutterError *ferror = [FlutterError errorWithCode:@"PERMISSION_DENIED"
+                                                  message:@"Location permission denied"
+                                                  details:nil];
+        if (self.locationWanted) {
+            self.locationWanted = NO;
+            self.flutterResult(ferror);
+        }
+        if (self.flutterListening) {
+            self.flutterEventSink(ferror);
+        } else {
+            [self.clLocationManager stopUpdatingLocation];
+        }
+    }
+}
+
 @end
